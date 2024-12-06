@@ -1,0 +1,297 @@
+local Players = game:GetService("Players") -- chat if ur gonna edit this, its gonna take a bit to read LOL
+local UserInputService = game:GetService("UserInputService") -- this whole thing is a brainfuck, i dont blame you if you stop skidding it :sob:
+local RunService = game:GetService("RunService")
+local LocalPlayer = Players.LocalPlayer
+local clipboardSet = setclipboard or toclipboard or set_clipboard
+
+local ScreenGui = Instance.new("ScreenGui")
+local MainFrame = Instance.new("Frame")
+local TabBar = Instance.new("Frame")
+local TabHolder = Instance.new("Frame")
+local ContentFrame = Instance.new("Frame")
+local ResizeHandle = Instance.new("Frame")
+local CloseButton = Instance.new("TextButton")
+local SettingsButton = Instance.new("TextButton")
+local SettingsMenu = Instance.new("Frame")
+
+local Tabs = {}
+local CurrentTab = nil
+local Offsets = {Animations = 0, Accessories = 0, Particles = 0, Sounds = 0}
+local LoggedItems = {Animations = {}, Accessories = {}, Particles = {}, Sounds = {}}
+local isDragging, resizing, settingsVisible = false, false, false
+local dragStart, startPos, resizeStart, initialSize
+local settingsDragStart, settingsStartPos
+
+ScreenGui.Name = "herkles gen logger"
+ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+ScreenGui.ResetOnSpawn = false
+
+MainFrame.Name = "MainFrame"
+MainFrame.Parent = ScreenGui
+MainFrame.BackgroundColor3 = Color3.new(0.1, 0.1, 0.1)
+MainFrame.BorderSizePixel = 1
+MainFrame.BorderColor3 = Color3.new(0.000000, 0.000000, 0.000000)
+MainFrame.Size = UDim2.new(0.4, 0, 0.5, 0)
+MainFrame.Position = UDim2.new(0.3, 0, 0.25, 0)
+
+TabBar.Name = "TabBar"
+TabBar.Parent = MainFrame
+TabBar.Size = UDim2.new(1, 0, 0.05, 0)
+TabBar.BackgroundColor3 = Color3.new(0.2, 0.2, 0.2)
+
+TabHolder.Name = "TabHolder"
+TabHolder.Parent = MainFrame
+TabHolder.BackgroundColor3 = Color3.new(0.15, 0.15, 0.15)
+TabHolder.Size = UDim2.new(1, 0, 0.05, 0)
+TabHolder.Position = UDim2.new(0, 0, 0.05, 0)
+
+ContentFrame.Name = "ContentFrame" -- contentframe is just the frame that the buttons are created in
+ContentFrame.Parent = MainFrame
+ContentFrame.BackgroundColor3 = Color3.new(0.15, 0.15, 0.15)
+ContentFrame.Size = UDim2.new(1, 0, 0.85, 0)
+ContentFrame.Position = UDim2.new(0, 0, 0.1, 0)
+
+ResizeHandle.Name = "ResizeHandle" -- this resizer is pretty broken, so just know that
+ResizeHandle.Parent = MainFrame
+ResizeHandle.Size = UDim2.new(0, 25, 0, 25)
+ResizeHandle.Position = UDim2.new(1, -25, 1, -25)
+ResizeHandle.BackgroundColor3 = Color3.new(0.3, 0.3, 0.3)
+
+CloseButton.Name = "CloseButton" -- obvious
+CloseButton.Parent = MainFrame
+CloseButton.Text = "X"
+CloseButton.Size = UDim2.new(0, 25, -0.01, 25)
+CloseButton.Position = UDim2.new(1, -25, 0, 0)
+CloseButton.BackgroundColor3 = Color3.new(0.3, 0.3, 0.3)
+CloseButton.BorderColor3 = Color3.new(0.000000, 0.000000, 0.000000)
+CloseButton.TextColor3 = Color3.new(1, 0, 0)
+CloseButton.TextScaled = true
+CloseButton.MouseButton1Click:Connect(function()
+    ScreenGui:Destroy()
+end)
+
+SettingsButton.Name = "SettingsButton" -- obvious again
+SettingsButton.Parent = MainFrame
+SettingsButton.Text = "⚙"
+SettingsButton.Size = UDim2.new(0, 25, -0.01, 25)
+SettingsButton.Position = UDim2.new(0, 1, 0, 1)
+SettingsButton.BackgroundColor3 = Color3.new(0.3, 0.3, 0.3)
+SettingsButton.BorderColor3 = Color3.new(0.000000, 0.000000, 0.000000)
+SettingsButton.TextColor3 = Color3.new(1, 1, 1)
+SettingsButton.TextScaled = true
+
+SettingsMenu.Name = "SettingsMenu" -- this is where shit goes downhill
+SettingsMenu.Parent = ScreenGui
+SettingsMenu.Size = UDim2.new(0.3, 0, 0.3, 0)
+SettingsMenu.Position = UDim2.new(0.35, 0, 0.35, 0)
+SettingsMenu.BackgroundColor3 = Color3.new(0.1, 0.1, 0.1)
+SettingsMenu.BorderColor3 = Color3.new(0.000000, 0.000000, 0.000000)
+SettingsMenu.Visible = false
+
+SettingsButton.MouseButton1Click:Connect(function()
+    settingsVisible = not settingsVisible
+    SettingsMenu.Visible = settingsVisible
+end)
+
+local function createTab(name, position)
+    local Tab = Instance.new("TextButton")
+    Tab.Name = name .. "Tab"
+    Tab.Parent = TabHolder
+    Tab.Size = UDim2.new(0.2, -5, 1, 0)
+    Tab.Position = UDim2.new((position - 1) * 0.2, 5, 0, 0)
+    Tab.BackgroundColor3 = Color3.new(0.3, 0.3, 0.3)
+    Tab.Text = name
+    Tab.TextColor3 = Color3.new(1, 1, 1)
+    Tab.TextScaled = true
+    Tab.MouseButton1Click:Connect(function()
+        for _, tabContent in pairs(Tabs) do
+            tabContent.Visible = false
+        end
+        Tabs[name].Visible = true
+        CurrentTab = Tabs[name]
+    end)
+    local Content = Instance.new("ScrollingFrame")
+    Content.Name = name .. "Content"
+    Content.Parent = ContentFrame
+    Content.Size = UDim2.new(1, 0, 1, 0)
+    Content.Visible = false
+    Content.CanvasSize = UDim2.new(0, 0, 0, 0)
+    Content.ScrollBarThickness = 5
+    Content.BackgroundColor3 = Color3.new(0.1, 0.1, 0.1)
+    Tabs[name] = Content
+end
+
+createTab("Animations", 1)
+createTab("Particles", 2)
+createTab("Accessories", 3)
+createTab("Sounds", 4)
+CurrentTab = Tabs["Animations"]
+CurrentTab.Visible = true
+
+local function logItem(tabName, itemName, assetId, offset)
+    local Button = Instance.new("TextButton")
+    Button.Name = itemName -- this is basically all the code
+    Button.Parent = Tabs[tabName]
+    Button.Size = UDim2.new(1, -10, 0, 50)
+    Button.Position = UDim2.new(0, 5, 0, offset)
+    Button.BackgroundColor3 = Color3.new(0.2, 0.2, 0.2)
+    Button.BorderColor3 = Color3.new(0.000000, 0.000000, 0.000000)
+    Button.Text = ""
+    
+    local NameLabel = Instance.new("TextLabel")
+    NameLabel.Parent = Button -- same for this, name is just the name of the logged whatever
+    NameLabel.Text = itemName
+    NameLabel.Size = UDim2.new(1, 0, 0.5, 0)
+    NameLabel.Position = UDim2.new(0, 0, 0, 0)
+    NameLabel.TextColor3 = Color3.new(1, 1, 1)
+    NameLabel.TextScaled = true
+    NameLabel.BackgroundTransparency = 1
+
+    local AssetLabel = Instance.new("TextLabel")
+    AssetLabel.Parent = Button -- this is the frame of the rbxasset id on each button
+    AssetLabel.Text = assetId
+    AssetLabel.Size = UDim2.new(1, 0, 0.5, -15)
+    AssetLabel.Position = UDim2.new(0, 0, 0.5, 0)
+    AssetLabel.TextColor3 = Color3.new(1, 1, 1)
+    AssetLabel.TextScaled = true
+    AssetLabel.BackgroundTransparency = 1
+
+    Button.MouseButton1Click:Connect(function()
+        clipboardSet(assetId)
+    end)
+end
+
+local function clearLogsForTab(tabName) -- shit barely works i cant lie
+    Tabs[tabName]:ClearAllChildren()
+    Offsets[tabName] = 0
+    LoggedItems[tabName] = {}
+end
+
+local function clearAllLogs() -- and this isnt any better
+    for tabName, _ in pairs(Tabs) do
+        clearLogsForTab(tabName)
+    end
+end
+
+local ClearSelectedButton = Instance.new("TextButton", SettingsMenu) -- this is the button that clears the selected tabs logs
+ClearSelectedButton.Text = "Clear Selected Tab Logs"
+ClearSelectedButton.Size = UDim2.new(1, -10, 0, 30)
+ClearSelectedButton.Position = UDim2.new(0, 5, 0, 5)
+ClearSelectedButton.BackgroundColor3 = Color3.new(0.2, 0.2, 0.2)
+ClearSelectedButton.BorderColor3 = Color3.new(0.000000, 0.000000, 0.000000)
+ClearSelectedButton.TextColor3 = Color3.new(1, 1, 1)
+ClearSelectedButton.MouseButton1Click:Connect(function()
+    clearLogsForTab(CurrentTab.Name:gsub("Content", ""))
+end)
+
+local ClearAllButton = Instance.new("TextButton", SettingsMenu)-- same here, just every tab, and both of these are broken for some games
+ClearAllButton.Text = "Clear All Logs"
+ClearAllButton.Size = UDim2.new(1, -10, 0, 30)
+ClearAllButton.Position = UDim2.new(0, 5, 0, 40)
+ClearAllButton.BackgroundColor3 = Color3.new(0.2, 0.2, 0.2)
+ClearAllButton.BorderColor3 = Color3.new(0.000000, 0.000000, 0.000000)
+ClearAllButton.TextColor3 = Color3.new(1, 1, 1)
+ClearAllButton.MouseButton1Click:Connect(clearAllLogs)
+
+RunService.RenderStepped:Connect(function() -- jumble of words, but its how we grab and make each button and its text
+    for _, track in pairs(LocalPlayer.Character:FindFirstChildWhichIsA("Humanoid"):GetPlayingAnimationTracks()) do
+        local animationId = track.Animation.AnimationId
+        if not LoggedItems["Animations"][animationId] then
+            LoggedItems["Animations"][animationId] = true
+            logItem("Animations", track.Animation.Name or "Animation", animationId, Offsets["Animations"])
+            Offsets["Animations"] = Offsets["Animations"] + 55
+            Tabs["Animations"].CanvasSize = UDim2.new(0, 0, 0, Offsets["Animations"])
+        end
+    end
+
+    for _, particle in pairs(LocalPlayer.Character:GetDescendants()) do
+        if particle:IsA("ParticleEmitter") and not LoggedItems["Particles"][particle.Texture or "No Asset ID"] then
+            LoggedItems["Particles"][particle.Texture or "No Asset ID"] = true
+            logItem("Particles", particle.Name, particle.Texture or "No Asset ID", Offsets["Particles"])
+            Offsets["Particles"] = Offsets["Particles"] + 55
+            Tabs["Particles"].CanvasSize = UDim2.new(0, 0, 0, Offsets["Particles"])
+        end
+    end
+
+    for _, accessory in pairs(LocalPlayer.Character:GetChildren()) do
+        if accessory:IsA("Accessory") and not LoggedItems["Accessories"][accessory.Name] then
+            LoggedItems["Accessories"][accessory.Name] = true
+            logItem("Accessories", accessory.Name, accessory.Name, Offsets["Accessories"])
+            Offsets["Accessories"] = Offsets["Accessories"] + 55
+            Tabs["Accessories"].CanvasSize = UDim2.new(0, 0, 0, Offsets["Accessories"])
+        end
+    end
+
+    for _, sound in pairs(LocalPlayer.Character:GetDescendants()) do
+        if sound:IsA("Sound") and not LoggedItems["Sounds"][sound.SoundId] then
+            LoggedItems["Sounds"][sound.SoundId] = true
+            logItem("Sounds", sound.Name or "Sound", sound.SoundId, Offsets["Sounds"])
+            Offsets["Sounds"] = Offsets["Sounds"] + 55
+            Tabs["Sounds"].CanvasSize = UDim2.new(0, 0, 0, Offsets["Sounds"])
+        end
+    end
+end)
+
+MainFrame.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        isDragging = true
+        dragStart = input.Position
+        startPos = MainFrame.Position
+    end
+end)
+
+MainFrame.InputChanged:Connect(function(input)
+    if isDragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+        local delta = input.Position - dragStart
+        MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+end)
+ -- more dragging physics coming soon, trust me <3
+MainFrame.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        isDragging = false
+    end
+end)
+
+SettingsMenu.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        isDragging = true
+        settingsDragStart = input.Position
+        settingsStartPos = SettingsMenu.Position
+    end
+end)
+
+SettingsMenu.InputChanged:Connect(function(input)
+    if isDragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+        local delta = input.Position - settingsDragStart
+        SettingsMenu.Position = UDim2.new(settingsStartPos.X.Scale, settingsStartPos.X.Offset + delta.X, settingsStartPos.Y.Scale, settingsStartPos.Y.Offset + delta.Y)
+    end
+end)
+
+SettingsMenu.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        isDragging = false
+    end
+end)
+
+ResizeHandle.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        resizing = true
+        resizeStart = input.Position
+        initialSize = MainFrame.Size
+    end
+end)
+
+ResizeHandle.InputChanged:Connect(function(input)
+    if resizing and input.UserInputType == Enum.UserInputType.MouseMovement then
+        local delta = input.Position - resizeStart
+        MainFrame.Size = UDim2.new(initialSize.X.Scale, initialSize.X.Offset + delta.X, initialSize.Y.Scale, initialSize.Y.Offset + delta.Y)
+    end
+end)
+
+ResizeHandle.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        resizing = false
+    end
+end)
+ -- we love herkles code dont we chat
